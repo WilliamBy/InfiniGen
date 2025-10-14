@@ -5,21 +5,21 @@ import os
 from utils import *
 
 def process_options():
-  parser = argparse.ArgumentParser(description="Generate partial weight")
-  parser.add_argument("--our_model_path", default=None, 
-                      help='our OPT model')
-  parser.add_argument("--skewing_matrix_path", default=None, 
-                      help='path to skewing matrix')
-  parser.add_argument("--model", default="facebook/opt-6.7b", 
-                      help='model')
-  parser.add_argument("--model_type", default = "opt", 
-                      help='model arch (opt, llama)')
-  parser.add_argument("--partial_weight_ratio", required=False, default=0.1, 
-                      help='Ours: partial weight ratio')
-  parser.add_argument("--output", required=True, 
-                      help='output directory to store result')
-  return parser
-    
+    parser = argparse.ArgumentParser(description="Generate partial weight")
+    parser.add_argument("--our_model_path", default=None, 
+                        help='our OPT model')
+    parser.add_argument("--skewing_matrix_path", default=None, 
+                        help='path to skewing matrix')
+    parser.add_argument("--model", default="facebook/opt-6.7b", 
+                        help='model')
+    parser.add_argument("--model_type", default = "opt", 
+                        help='model arch (opt, llama)')
+    parser.add_argument("--partial_weight_ratio", required=False, default=0.1, 
+                        help='Ours: partial weight ratio')
+    parser.add_argument("--output", required=True, 
+                        help='output directory to store result')
+    return parser
+
 def main():
     ## get arguments
     parser = process_options()
