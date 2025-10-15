@@ -27,7 +27,7 @@ import json
 import tqdm 
 import copy 
 
-from transformers import (
+from modelscope import (
     CTRLLMHeadModel,
     CTRLTokenizer,
     GPT2LMHeadModel,
@@ -42,7 +42,7 @@ from transformers import (
     XLNetTokenizer,
 )
 
-from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
+from modelscope import AutoModelForCausalLM, AutoTokenizer, AutoConfig
 
 from utils_hh.modify_llama import convert_kvcache_llama_heavy_recent, LlamaAttention_heavy_hitter
 from utils_hh.modify_gptneox import convert_kvcache_gpt_neox_heavy_recent, GPTNeoXAttention_Mask

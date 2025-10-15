@@ -308,7 +308,7 @@ def rotate_half(x):
     return torch.cat((-x2, x1), dim=-1)
 
 
-# Copied from transformers.models.gpt_neox.modeling_gpt_neox.apply_rotary_pos_emb
+# Copied from modelscope.models.gpt_neox.modeling_gpt_neox.apply_rotary_pos_emb
 def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
     cos = cos[position_ids].unsqueeze(1)  # [seq_len, dim] -> [batch_size, 1, seq_len, head_dim]
     sin = sin[position_ids].unsqueeze(1)
@@ -1152,7 +1152,7 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
         Example:
 
         ```python
-        >>> from transformers import AutoTokenizer, LlamaForCausalLM
+        >>> from modelscope import AutoTokenizer, LlamaForCausalLM
 
         >>> model = LlamaForCausalLM.from_pretrained(PATH_TO_CONVERTED_WEIGHTS)
         >>> tokenizer = AutoTokenizer.from_pretrained(PATH_TO_CONVERTED_TOKENIZER)

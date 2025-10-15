@@ -14,8 +14,8 @@ from torch.cuda.amp import autocast
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 
 
-from transformers.models.llama.configuration_llama import LlamaConfig
-from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding, LlamaAttention, apply_rotary_pos_emb
+from modelscope.models.llama.configuration_llama import LlamaConfig
+from modelscope.models.llama.modeling_llama import LlamaRotaryEmbedding, LlamaAttention, apply_rotary_pos_emb
 
 
 __all__ = ['convert_kvcache_llama_heavy_recent', 'LlamaAttention_heavy_hitter']

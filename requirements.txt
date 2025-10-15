@@ -1,7 +1,5 @@
 torch==2.0.1
 torchvision==0.15.2
 torchaudio==2.0.2
-sentencepiece
 lm-eval==0.3.0
-ftfy
-accelerate
+modelscope==1.30.0

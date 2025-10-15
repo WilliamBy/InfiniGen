@@ -64,7 +64,7 @@ OPT_PRETRAINED_MODEL_ARCHIVE_LIST = [
 ]
 
 
-# Copied from transformers.models.bart.modeling_bart._make_causal_mask
+# Copied from modelscope.models.bart.modeling_bart._make_causal_mask
 def _make_causal_mask(
     input_ids_shape: torch.Size, dtype: torch.dtype, device: torch.device, past_key_values_length: int = 0
 ):
@@ -570,7 +570,7 @@ class OPTDecoder(OPTPreTrainedModel):
     def set_input_embeddings(self, value):
         self.embed_tokens = value
 
-    # Copied from transformers.models.bart.modeling_bart.BartDecoder._prepare_decoder_attention_mask
+    # Copied from modelscope.models.bart.modeling_bart.BartDecoder._prepare_decoder_attention_mask
     def _prepare_decoder_attention_mask(self, attention_mask, input_shape, inputs_embeds, past_key_values_length):
         # create causal mask
         # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
@@ -955,7 +955,7 @@ class OPTForCausalLM(OPTPreTrainedModel):
         Example:
 
         ```python
-        >>> from transformers import AutoTokenizer, OPTForCausalLM
+        >>> from modelscope import AutoTokenizer, OPTForCausalLM
 
         >>> model = OPTForCausalLM.from_pretrained("facebook/opt-350m")
         >>> tokenizer = AutoTokenizer.from_pretrained("facebook/opt-350m")
@@ -1219,7 +1219,7 @@ class OPTForQuestionAnswering(OPTPreTrainedModel):
         Example:
 
         ```python
-        >>> from transformers import AutoTokenizer, OPTForQuestionAnswering
+        >>> from modelscope import AutoTokenizer, OPTForQuestionAnswering
         >>> import torch
 
         >>> torch.manual_seed(4)  # doctest: +IGNORE_RESULT

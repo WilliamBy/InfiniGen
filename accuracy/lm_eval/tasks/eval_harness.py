@@ -10,7 +10,7 @@ from tasks.util import sample_batch, shrink_seq
 import multiprocessing
 import ftfy
 
-from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
+from modelscope import AutoModelForCausalLM, AutoTokenizer, AutoConfig
 
 tokenizer = None
 

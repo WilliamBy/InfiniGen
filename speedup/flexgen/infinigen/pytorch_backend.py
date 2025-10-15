@@ -17,9 +17,9 @@ from flexgen.utils import (GB, T, cpu_mem_stats, vector_gather,
     np_dtype_to_torch_dtype, torch_dtype_to_np_dtype,
     torch_dtype_to_num_bytes)
 
-from infinigen.skewing_controller import reform_hidden_states, skew
-from infinigen.partial_weight_generation_controller import partial_weight_index_generation
-from infinigen.kv_selection_controller import speculate_attention
+from infinigen.infinigen.skewing_controller import reform_hidden_states, skew
+from infinigen.infinigen.partial_weight_generation_controller import partial_weight_index_generation
+from infinigen.infinigen.kv_selection_controller import speculate_attention
 
 general_copy_compressed = TorchCompressedDevice = None
 global_cpu_device = None

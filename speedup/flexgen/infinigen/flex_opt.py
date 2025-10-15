@@ -13,7 +13,7 @@ from typing import Union, List, Optional
 import numpy as np
 from tqdm import tqdm
 import torch
-from transformers import AutoTokenizer
+from modelscope import AutoTokenizer
 
 from flexgen.compression import CompressionConfig
 from flexgen.opt_config import OptConfig, get_opt_config, download_opt_weights
@@ -25,9 +25,9 @@ from flexgen.utils import (Task, ExecutionEnv, GB, T, ValueHolder,
     torch_mem_stats, torch_dtype_to_np_dtype, write_benchmark_log,
     read_benchmark_log)
 
-from infinigen.skewing_controller import weight_bias_concat
-from infinigen.kv_selection_controller import select_kv
-from infinigen.partial_weight_generation_controller import set_partial_cache, set_partial_weight
+from infinigen.infinigen.skewing_controller import weight_bias_concat
+from infinigen.infinigen.kv_selection_controller import select_kv
+from infinigen.infinigen.partial_weight_generation_controller import set_partial_cache, set_partial_weight
 
 fix_recursive_import()
 
@@ -1331,7 +1331,7 @@ def run_flexgen(args):
     if args.model == "facebook/galactica-30b":
         tokenizer = AutoTokenizer.from_pretrained("facebook/galactica-30b", padding_side="left")
     else:
-        tokenizer = AutoTokenizer.from_pretrained("facebook/opt-30b", padding_side="left")
+        tokenizer = AutoTokenizer.from_pretrained("facebook/opt-6.7b", padding_side="left")
     num_prompts = args.num_gpu_batches * args.gpu_batch_size
     prompt_len, gen_len, cut_gen_len = args.prompt_len, args.gen_len, args.cut_gen_len
 

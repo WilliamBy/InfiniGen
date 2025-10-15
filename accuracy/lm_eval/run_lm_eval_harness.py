@@ -65,7 +65,7 @@ if __name__ == '__main__':
     output_path = args.output_path
     model_name = args.model_name
 
-    from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
+    from modelscope import AutoModelForCausalLM, AutoTokenizer, AutoConfig
     config = AutoConfig.from_pretrained(model_name)
     tokenizer = AutoTokenizer.from_pretrained(model_name, device_map = 'auto', torch_dtype=torch.float16)
     if args.model_path is None:

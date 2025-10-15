@@ -1,4 +1,4 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from modelscope import AutoModelForCausalLM, AutoTokenizer
 import argparse
 import torch
 import os

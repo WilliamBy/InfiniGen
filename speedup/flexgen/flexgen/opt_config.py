@@ -128,7 +128,7 @@ def get_opt_config(name, **kwargs):
 def download_opt_weights_old(model_name, path):
     """Download weights from huggingface."""
     import torch
-    from transformers import OPTForCausalLM, BloomForCausalLM
+    from modelscope import OPTForCausalLM, BloomForCausalLM
 
     if "/" in model_name:
         model_name = model_name.split("/")[1].lower()
