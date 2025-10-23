@@ -17,7 +17,7 @@ from modelscope import AutoTokenizer
 
 from flexgen.compression import CompressionConfig
 from flexgen.opt_config import OptConfig, get_opt_config, download_opt_weights
-from flexgen.pytorch_backend import (TorchDevice, TorchDisk, TorchLink, TorchTensor,
+from flexgen.h2o.pytorch_backend import (TorchDevice, TorchDisk, TorchLink, TorchTensor,
     TorchMixedDevice, DeviceType, general_copy, fix_recursive_import,
     cache_replace, acc_replace)
 from flexgen.timer import timers

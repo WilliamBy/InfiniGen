@@ -217,7 +217,7 @@ def disable_hf_opt_init():
 
 
 def download_opt_weights(model_name, path):
-    from huggingface_hub import snapshot_download
+    from modelscope import snapshot_download
     import torch
 
     print(f"Load the pre-trained pytorch weights of {model_name} from huggingface. "
