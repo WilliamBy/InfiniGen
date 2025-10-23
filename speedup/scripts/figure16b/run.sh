@@ -12,9 +12,9 @@ do
     ln -s ../$SCHEME/pytorch_backend.py $FLEXGEN_PATH/flexgen/pytorch_backend.py
   fi
 
-  for MODEL in "opt-6.7b" "opt-13b" "opt-30b"
+  for MODEL in "opt-6.7b" "opt-13b"
   do
-    CMD="--model huggingface/$MODEL"
+    CMD="--model facebook/$MODEL"
     if [ "$MODEL" = "opt-30b" ]
     then
       CMD=$CMD" --percent 70 30 0 100 100 0"
