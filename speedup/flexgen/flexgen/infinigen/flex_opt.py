@@ -18,12 +18,16 @@ from modelscope import AutoTokenizer
 from flexgen.compression import CompressionConfig
 from flexgen.opt_config import OptConfig, get_opt_config, download_opt_weights
 from flexgen.pytorch_backend import (TorchDevice, TorchDisk, TorchLink,
-    TorchMixedDevice, DeviceType, general_copy, fix_recursive_import)
+    TorchMixedDevice, DeviceType, general_copy, fix_recursive_import, TorchTensor)
 from flexgen.timer import timers
 from flexgen.utils import (Task, ExecutionEnv, GB, T, ValueHolder,
     array_1d, array_2d, array_3d, str2bool, project_decode_latency,
     torch_mem_stats, torch_dtype_to_np_dtype, write_benchmark_log,
     read_benchmark_log)
+
+from infinigen.skewing_controller import weight_bias_concat
+from infinigen.kv_selection_controller import select_kv
+from infinigen.partial_weight_generation_controller import set_partial_cache, set_partial_weight
 
 fix_recursive_import()
 
@@ -262,7 +266,7 @@ class OutputEmbed:
 
 
 class SelfAttention:
-    def __init__(self, config, env, policy, layer_id):
+    def __init__(self, config, env, policy, layer_id, enable_prefetching, partial_weight_ratio=0.2, alpha=4, max_num_kv=400):
         self.config = config
         self.env = env
         self.layer_id = layer_id
@@ -274,6 +278,16 @@ class SelfAttention:
             else self.env.gpu)
 
         self.task = None
+        self.enable_prefetching = enable_prefetching
+        self.prefetch_idx = None
+        self.prefetch_kv = None
+        self.partial_index = None
+        self.alpha = alpha
+        self.max_num_kv = max_num_kv
+        if self.layer_id > 1:
+            self.partial_weight_ratio = partial_weight_ratio
+        else:
+            self.partial_weight_ratio = None
 
     def set_task(self, task):
         self.task = task
@@ -304,6 +318,15 @@ class SelfAttention:
             ((h,), dtype, path + "_layer_norm.bias"),
         ]
         weights = init_weight_list(weight_specs, self.policy, self.env)
+
+        # WQ
+        head_dim = h // self.config.n_head
+        weights[0].data = weight_bias_concat(weights[0].data, weights[1].data, True, head_dim)
+        weights[0].shape = (h, h+1)
+        # WK
+        weights[2].data = weight_bias_concat(weights[2].data, weights[3].data)
+        weights[2].shape = (h, h+1)
+
         weight_home.store(weights)
 
     def load_weight(self, weight_home, weight_read_buf, k):
@@ -334,6 +357,8 @@ class SelfAttention:
 
         cache = device.init_cache_one_gpu_batch(self.config, self.task, self.policy)
         cache_home.store(cache)
+        if self.layer_id > 1:
+            self.prefetch_kv = device.allocate((2, self.max_num_kv, cache_home.val[0].shape[1], cache_home.val[0].shape[2]), np.float16, pin_memory=True)
 
     def load_cache(self, cache_home, cache_read_buf, i):
         if i == 0:  # prefill, no cache
@@ -402,6 +427,47 @@ class SelfAttention:
         else:
             raise ValueError(f"Invalid path: {path}")
 
+    def prefetch_cache(self, cache_home, cache_read_buf, i, prefetch_idx, prefetch_cache_stream):
+        if i == 0:  # prefill, no cache
+            return
+
+        k_home, v_home = cache_home.val
+
+        # Pick code path
+        if self.policy.compress_cache:
+            path = 0
+            dst = self.attention_compute.compressed_device
+        else:
+            if self.policy.cpu_cache_compute:
+                if (k_home.device.device_type == DeviceType.MIXED and
+                    k_home.data[0][0] is not None):
+                    path = 2
+                else:
+                    path = 1
+            else:
+                path = 0
+            dst = self.attention_compute
+
+        if path == 0:  # Direct copy
+            # shape: (s, b * n_head, head_dim)
+            indices = (slice(0, prefetch_idx.shape[0]),
+                       slice(0, k_home.shape[1]))
+
+            if self.policy.attn_sparsity >= 1.0:
+                self.prefetch_kv.data[0, :prefetch_idx.shape[0]], self.prefetch_kv.data[1, :prefetch_idx.shape[0]] = select_kv(prefetch_idx, k_home.data, v_home.data)
+                k_c = TorchTensor((prefetch_idx.shape[0], k_home.shape[1], k_home.shape[2]), k_home.dtype, self.prefetch_kv.data[0, :prefetch_idx.shape[0]], k_home.device)
+                v_c = TorchTensor((prefetch_idx.shape[0], v_home.shape[1], v_home.shape[2]), v_home.dtype, self.prefetch_kv.data[1, :prefetch_idx.shape[0]], v_home.device)
+
+                with torch.cuda.stream(prefetch_cache_stream):
+                    cache_read_buf.store((
+                        k_c.smart_copy(dst, indices),
+                        v_c.smart_copy(dst, indices),
+                    ))
+        elif path == 1 or path == 2:
+            raise ValueError(f"Not implemented path: {path}")
+        else:
+            raise ValueError(f"Invalid path: {path}")
+
     def store_cache(self, cache_home, cache_write_buf, i):
         # shape: (s, b * n_head, head_dim)
         k_home, v_home = cache_home.val
@@ -425,11 +491,12 @@ class SelfAttention:
         return (batch_size, seq_len, self.config.input_dim), self.config.dtype
 
     def forward(self, hidden, cache_read_buf, weight_read_buf, attention_mask,
-                cache_write_buf, i, k):
+                cache_write_buf, i, k, warmup, partial_weight_read_buf, partial_cache_read_buf, speculation_stream, prev_partial_cache_read_buf, prev_partial_weight_read_buf, weight_home):
         n_head = self.config.n_head
 
         donate = [False] * 14
         h, donate[0] = hidden.val, True
+        head_dim = h.shape[-1] // n_head
 
         if k == self.policy.num_gpu_batches - 1:
             # Clear the weight_read_buf if it is the last gpu batch
@@ -440,21 +507,39 @@ class SelfAttention:
             ((w_q, _), (b_q, _), (w_k, _), (b_k, _),
              (w_v, _), (b_v, _), (w_out, _), (b_out, _),
              (w_ln, _), (b_ln, _)) = weight_read_buf.val
+        if self.enable_prefetching and (i > 0):
+            p_w_q = partial_weight_read_buf.val
 
         if i == 0:  # prefill
             mask, donate[1] = attention_mask.val.smart_copy(self.compute)
-            h, new_k_cache, new_v_cache = self.compute.mha(h, mask, w_q, b_q,
+            h, new_k_cache, new_v_cache, w_q, w_k, self.partial_index = self.compute.mha(h, mask, w_q, b_q,
                 w_k, b_k, w_v, b_v, w_out, b_out, w_ln, b_ln, n_head, donate,
-                self.policy.compress_cache, self.policy.comp_cache_config)
+                self.policy.compress_cache, self.policy.comp_cache_config, warmup, self.partial_weight_ratio)
             cache_write_buf.store((new_k_cache, new_v_cache))
+            if (prev_partial_cache_read_buf is not None) and (not warmup):
+                prev_partial_cache_read_buf.store(set_partial_cache(new_k_cache.data, self.partial_index, n_head, head_dim))
+                prev_partial_weight_read_buf.store(set_partial_weight(w_q.data, self.partial_index, n_head, head_dim))
+            if warmup:
+                weight_home.val[0] = w_q.smart_copy(weight_home.val[0].device)[0]
+                weight_home.val[2] = w_k.smart_copy(weight_home.val[2].device)[0]
         else:  # decoding
             mask, donate[1] = attention_mask.val.smart_copy(self.attention_compute)
             (k_cache, donate[12]), (v_cache, donate[13]) = cache_read_buf.pop()
-            h, new_k_cache, new_v_cache = self.compute.mha_gen(h, mask, w_q,
-                b_q, w_k, b_k, w_v, b_v, w_out, b_out, w_ln, b_ln, n_head,
-                k_cache, v_cache, donate, self.policy.attn_sparsity,
-                self.policy.compress_cache, self.policy.comp_cache_config)
+            if self.enable_prefetching:
+                partial_k_cache = partial_cache_read_buf.val
+            if self.enable_prefetching:
+                h, new_k_cache, new_v_cache, self.prefetch_idx = self.compute.mha_gen(h, mask, w_q,
+                    b_q, w_k, b_k, w_v, b_v, w_out, b_out, w_ln, b_ln, n_head,
+                    k_cache, v_cache, donate, self.policy.attn_sparsity,
+                    self.policy.compress_cache, self.policy.comp_cache_config, p_w_q, partial_k_cache, speculation_stream, self.alpha, self.max_num_kv)
+            else:
+                h, new_k_cache, new_v_cache, _ = self.compute.mha_gen(h, mask, w_q,
+                    b_q, w_k, b_k, w_v, b_v, w_out, b_out, w_ln, b_ln, n_head,
+                    k_cache, v_cache, donate, self.policy.attn_sparsity,
+                    self.policy.compress_cache, self.policy.comp_cache_config, None, None, None, None, None)
             cache_write_buf.store((new_k_cache, new_v_cache))
+            if (prev_partial_cache_read_buf is not None) and (self.layer_id > 1):
+                prev_partial_cache_read_buf.val = torch.cat((prev_partial_cache_read_buf.val, set_partial_cache(new_k_cache.data, self.partial_index, n_head, head_dim)))
 
         hidden.val = h
 
@@ -584,7 +669,11 @@ class OptLM:
                  config: Union[str, OptConfig],
                  env: ExecutionEnv,
                  path: str,
-                 policy: Policy):
+                 policy: Policy,
+                 partial_weight_ratio,
+                 alpha,
+                 max_num_kv
+                 ):
         if isinstance(config, str):
             config = get_opt_config(config)
         self.config = config
@@ -594,13 +683,19 @@ class OptLM:
         self.num_gpu_batches = policy.num_gpu_batches
 
         layers = []
+        self.attn_layer = []
         layers.append(InputEmbed(self.config, self.env, self.policy))
         for i in range(self.config.num_hidden_layers):
             if policy.sep_layer:
-                layers.append(SelfAttention(self.config, self.env, self.policy, i))
+                if (i == 0) or (i == (self.config.num_hidden_layers - 1)):
+                    layers.append(SelfAttention(self.config, self.env, self.policy, i, False, partial_weight_ratio, alpha, max_num_kv))
+                else:
+                    layers.append(SelfAttention(self.config, self.env, self.policy, i, True, partial_weight_ratio, alpha, max_num_kv))
+                self.attn_layer.append(len(layers) - 1)
                 layers.append(MLP(self.config, self.env, self.policy, i))
             else:
                 layers.append(TransformerLayer(self.config, self.env, self.policy, i))
+                self.attn_layer.append(len(layers) - 1)
         layers.append(OutputEmbed(self.config, self.env, self.policy))
         self.layers = layers
         self.num_layers = len(layers)
@@ -618,6 +713,12 @@ class OptLM:
         self.load_weight_stream = torch.cuda.Stream()
         self.load_cache_stream = torch.cuda.Stream()
         self.store_cache_stream = torch.cuda.Stream()
+        self.speculation_stream = torch.cuda.Stream()
+        # CUDA streams [j][k]
+        self.prefetch_cache_stream = torch.cuda.Stream()
+
+        # Event (To start self attention after prefetching)
+        self.prefetch_evt = torch.cuda.Event()
 
         # Intermediate tensors
         # The following buffers store values used
@@ -628,8 +729,10 @@ class OptLM:
         self.cache_home = array_2d(num_layers, num_gpu_batches, ValueHolder)
         self.cache_read_buf = array_2d(num_layers, num_gpu_batches, ValueHolder)
         self.cache_write_buf = array_2d(num_layers, num_gpu_batches, ValueHolder)
+        self.partial_cache_read_buf = array_2d(num_layers, num_gpu_batches, ValueHolder)
         # weight[j]
         self.weight_read_buf = array_1d(num_layers, ValueHolder)
+        self.partial_weight_read_buf = array_1d(num_layers, ValueHolder)
         # attention_mask[k]
         self.attention_mask = array_1d(num_gpu_batches, ValueHolder)
 
@@ -693,9 +796,30 @@ class OptLM:
         # Load from cache_home to cache_read_buf
         if overlap:
             with torch.cuda.stream(self.load_cache_stream):
-                self.layers[j].load_cache(self.cache_home[j][k], self.cache_read_buf[j][k], i)
+                if j not in self.attn_layer[2:]:
+                    self.layers[j].load_cache(self.cache_home[j][k], self.cache_read_buf[j][k], i)
         else:
-            self.layers[j].load_cache(self.cache_home[j][k], self.cache_read_buf[j][k], i)
+            if j not in self.attn_layer[2:]:
+                self.layers[j].load_cache(self.cache_home[j][k], self.cache_read_buf[j][k], i)
+
+    def prefetch_cache(self, i, j, k, overlap=True):
+        # Handle corner cases
+        if i == 0:  # prefill, no cache
+            return
+        if k == self.num_gpu_batches:
+            k = 0
+            j += 1
+        if j == self.num_layers:
+            j = 0
+            i += 1
+            if i == self.execute_gen_len:
+                return
+
+        prefetch_idx = self.layers[j].prefetch_idx
+        next_attn = self.attn_layer[self.attn_layer.index(j) + 1]
+
+        # Load from cache_home to cache_read_buf
+        self.layers[next_attn].prefetch_cache(self.cache_home[next_attn][k], self.cache_read_buf[next_attn][k], i, prefetch_idx, self.prefetch_cache_stream)
 
     def store_cache(self, i, j, k, overlap=True):
         # Handle corner cases
@@ -786,9 +910,24 @@ class OptLM:
         # Clear the weight_read_buf if it is the last gpu batch
         # Clear the cache_read_buf
         # Run layer computation
-        self.layers[j].forward(self.hidden[i][j][k], self.cache_read_buf[j][k],
-            self.weight_read_buf[j], self.attention_mask[k],
-            self.cache_write_buf[j][k], i, k)
+        if isinstance(self.layers[j], SelfAttention) or isinstance(self.layers[j], TransformerLayer):
+            if k==0: # Generate skewing matrix for first input of warmup
+                warmup_state = (not k) and self.warmup
+                if j in self.attn_layer[2:]:
+                    prev_attn = self.attn_layer[self.attn_layer.index(j) - 1]
+                    self.layers[j].forward(self.hidden[i][j][k], self.cache_read_buf[j][k],
+                        self.weight_read_buf[j], self.attention_mask[k],
+                        self.cache_write_buf[j][k], i, k, warmup_state, self.partial_weight_read_buf[j], self.partial_cache_read_buf[j][k], self.speculation_stream,
+                        self.partial_cache_read_buf[prev_attn][k], self.partial_weight_read_buf[prev_attn], self.weight_home[j])
+                else:
+                    self.layers[j].forward(self.hidden[i][j][k], self.cache_read_buf[j][k],
+                        self.weight_read_buf[j], self.attention_mask[k],
+                        self.cache_write_buf[j][k], i, k, warmup_state, self.partial_weight_read_buf[j], self.partial_cache_read_buf[j][k], self.speculation_stream,
+                        None, None, self.weight_home[j])
+        else:
+            self.layers[j].forward(self.hidden[i][j][k], self.cache_read_buf[j][k],
+                self.weight_read_buf[j], self.attention_mask[k],
+                self.cache_write_buf[j][k], i, k)
 
     def sync(self):
         self.env.disk.synchronize()
@@ -830,7 +969,8 @@ class OptLM:
                  stop: Optional[int] = None,
                  debug_mode: Optional[str] = None,
                  cut_gen_len: Optional[int] = None,
-                 verbose: int = 0):
+                 verbose: int = 0,
+                 warmup: bool = False):
         task = Task(
             inputs=inputs,
             prompt_len=len(inputs[0]),
@@ -846,6 +986,7 @@ class OptLM:
         overlap = self.policy.overlap
         prompt_len, gen_len = task.prompt_len, task.gen_len
         self.execute_gen_len = task.cut_gen_len if task.cut_gen_len else task.gen_len
+        self.warmup = warmup
 
         # Output token ids
         self.output_ids = np.full((len(task.inputs), prompt_len + gen_len),
@@ -863,8 +1004,10 @@ class OptLM:
                 self.cache_home[j][k].clear()
                 self.cache_read_buf[j][k].clear()
                 self.cache_write_buf[j][k].clear()
+                self.partial_cache_read_buf[j][k].clear()
         for j in range(num_layers):
             self.weight_read_buf[j].clear()
+            self.partial_weight_read_buf[j].clear()
         for k in range(num_gpu_batches):
             self.attention_mask[k].clear()
         self.hidden = array_3d(gen_len, num_layers, num_gpu_batches, ValueHolder)
@@ -921,10 +1064,15 @@ class OptLM:
                 for k in range(self.num_gpu_batches):
                     self.load_cache(i, j, k, overlap=False)
                     self.load_hidden(i, j, k)
+                    if (j in self.attn_layer[1:-1]) and (i > 0):
+                        self.sync()
                     self.compute_layer(i, j, k)
                     self.sync()
                     self.store_hidden(i, j, k)
                     self.store_cache(i, j, k, overlap=False)
+                    if j in self.attn_layer[1:-1] and (i > 0):
+                        self.prefetch_cache(i, j, k, overlap=True)
+                        self.prefetch_evt.record()
             timers("generate").stop()
 
     def generation_loop_debug_normal(self):
@@ -1183,7 +1331,7 @@ def run_flexgen(args):
     if args.model == "facebook/galactica-30b":
         tokenizer = AutoTokenizer.from_pretrained("facebook/galactica-30b", padding_side="left")
     else:
-        tokenizer = AutoTokenizer.from_pretrained("facebook/opt-30b", padding_side="left")
+        tokenizer = AutoTokenizer.from_pretrained("facebook/opt-6.7b", padding_side="left")
     num_prompts = args.num_gpu_batches * args.gpu_batch_size
     prompt_len, gen_len, cut_gen_len = args.prompt_len, args.gen_len, args.cut_gen_len
 
@@ -1213,11 +1361,11 @@ def run_flexgen(args):
     opt_config = get_opt_config(args.model)
     cache_size = opt_config.cache_bytes(num_prompts, prompt_len + gen_len)
     hidden_size = opt_config.hidden_bytes(num_prompts, prompt_len + gen_len)
-    model = OptLM(opt_config, env, args.path, policy)
+    model = OptLM(opt_config, env, args.path, policy, args.partial_weight_ratio, args.alpha, args.max_num_kv)
 
     try:
         output_ids = model.generate(
-            warmup_inputs, max_new_tokens=1, verbose=args.verbose)
+            warmup_inputs, max_new_tokens=1, verbose=args.verbose, warmup=True)
 
         timers("generate").reset()
         output_ids = model.generate(
@@ -1244,10 +1392,7 @@ def run_flexgen(args):
     projected = bool(args.debug_mode or cut_gen_len)
 
     print("+++++++++++++++++++++++++++++++++++++++++++++++++")
-    if args.compress_cache:
-        print("FlexGen + INT4")
-    else:
-        print("FlexGen")
+    print("InfiniGen (Ours)")
     print("input: " + str(prompt_len) + " output: " + str(gen_len) + " bsz: " + str(num_prompts))
     print("+++++++++++++++++++++++++++++++++++++++++++++++++")
     print("Total: " + str(total_latency) + " Prefill: " + str(prefill_latency) + " Decode: " + str(decode_latency))
@@ -1297,6 +1442,10 @@ def add_parser_arguments(parser):
     parser.add_argument("--overlap", type=str2bool, nargs='?',
         const=True, default=True)
 
+    parser.add_argument("--alpha", type=int, default=4)
+    parser.add_argument("--partial-weight-ratio", type=float, default=0.2)
+    parser.add_argument("--max-num-kv", type=int, default=400)
+
     parser.add_argument("--warmup-input-path", type=str)
     parser.add_argument("--test-input-path", type=str)
 
@@ -1308,3 +1457,4 @@ if __name__ == "__main__":
     assert len(args.percent) == 6
 
     run_flexgen(args)
+
