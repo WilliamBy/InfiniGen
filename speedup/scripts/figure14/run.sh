@@ -16,15 +16,11 @@ done
 FLEXGEN_PATH=$PWD/../../flexgen
 for SCHEME in "original" "int4" "h2o" "infinigen"
 do
-  rm $FLEXGEN_PATH/flexgen/flex_opt.py
-  rm $FLEXGEN_PATH/flexgen/pytorch_backend.py
   if [ "$SCHEME" = "int4" ]
   then
-    ln -s ../original/flex_opt.py $FLEXGEN_PATH/flexgen/flex_opt.py
-    ln -s ../original/pytorch_backend.py $FLEXGEN_PATH/flexgen/pytorch_backend.py
+    MODULE=flexgen.flex_opt
   else
-    ln -s ../$SCHEME/flex_opt.py $FLEXGEN_PATH/flexgen/flex_opt.py
-    ln -s ../$SCHEME/pytorch_backend.py $FLEXGEN_PATH/flexgen/pytorch_backend.py
+    MODULE=flexgen.${SCHEME}.flex_opt
   fi
 
   CMD="--model facebook/opt-13b --percent 100 0 0 100 100 0 --overlap false --gpu-batch-size 20 --num-gpu-batches 1 --prompt-len 1920 --gen-len 128 --warmup-input-path pg19_firstbook.txt --test-input-path pg19_firstbook.txt"
@@ -38,5 +34,5 @@ do
   then
     CMD=$CMD" --alpha 4 --partial-weight-ratio 0.2 --max-num-kv 400"
   fi
-  python -m flexgen.flex_opt $CMD
+  python -m $MODULE $CMD
 done
