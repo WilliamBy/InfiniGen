@@ -22,7 +22,7 @@ for task in ["piqa", "openbookqa", "winogrande", "copa", "rte"]:
 ## Baseline
 print("="*10+" Full cache " + "="*10)
 # OPT
-for size in ["6.7b", "13b", "30b"]:
+for size in ["6.7b", "13b"]:
     if size == "6.7b":
         tasks = ["piqa", "openbookqa"]
     elif size == "13b":
@@ -63,7 +63,7 @@ for size in ["7b", "13b"]:
 # InfiniGen
 print("="*10+" InfiniGen " + "="*10)
 # OPT
-for size in ["6.7b", "13b", "30b"]:
+for size in ["6.7b", "13b"]:
     if size == "6.7b":
         tasks = ["piqa", "openbookqa"]
     elif size == "13b":
@@ -118,7 +118,7 @@ for size in ["7b", "13b"]:
 ## H2O
 print("="*10+" H2O " + "="*10)
 # OPT
-for size in ["6.7b", "13b", "30b"]:
+for size in ["6.7b", "13b"]:
     if size == "6.7b":
         tasks = ["piqa", "openbookqa"]
     elif size == "13b":
@@ -165,7 +165,7 @@ for size in ["7b", "13b"]:
 ## Quant.
 print("="*10+" Quantization " + "="*10)
 # OPT
-for size in ["6.7b", "13b", "30b"]:
+for size in ["6.7b", "13b"]:
     if size == "6.7b":
         tasks = ["piqa", "openbookqa"]
     elif size == "13b":

@@ -7,7 +7,7 @@ seqlen=2048
 alpha=4
 budget=0.2
 
-for size in 6.7b 13b 30b;do
+for size in 6.7b 13b;do
   for dataset in "wikitext2" "ptb";do
     echo opt-$size ${dataset} 100% cache
     python opt.py --model "../setup/opt-model/opt-${size}" \
@@ -24,7 +24,7 @@ for size in 6.7b 13b 30b;do
   done
 done
 
-for size in 6.7b 13b 30b;do
+for size in 6.7b 13b;do
   for dataset in "wikitext2" "ptb";do
     for evict in fifo lru counter;do
       echo opt-$size ${dataset} 80% cache evict ${evict}

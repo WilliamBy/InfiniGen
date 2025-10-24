@@ -11,7 +11,7 @@ cd ${CWD}
 
 # ========= InfiniGen ============
 # generate opt models w/skewing
-for size in 6.7b 13b 30b;do
+for size in 6.7b 13b;do
   python gen_opt_model.py \
     --model "facebook/opt-${size}" \
     --output "./opt-model"
@@ -28,7 +28,7 @@ done
 # generate partial weight matrices for prediction
 PARTIAL_RATIO=0.2
 # opt
-for size in 6.7b 13b 30b;do
+for size in 6.7b 13b;do
   python gen_partial_weight.py \
     --our_model_path "./opt-model/opt-${size}" \
     --model "facebook/opt-${size}" \
