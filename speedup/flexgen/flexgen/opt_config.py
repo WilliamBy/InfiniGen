@@ -128,7 +128,7 @@ def get_opt_config(name, **kwargs):
 def download_opt_weights_old(model_name, path):
     """Download weights from huggingface."""
     import torch
-    from modelscope import OPTForCausalLM, BloomForCausalLM
+    from transformers import OPTForCausalLM, BloomForCausalLM
 
     if "/" in model_name:
         model_name = model_name.split("/")[1].lower()
@@ -217,7 +217,7 @@ def disable_hf_opt_init():
 
 
 def download_opt_weights(model_name, path):
-    from modelscope import snapshot_download
+    from transformers import snapshot_download
     import torch
 
     print(f"Load the pre-trained pytorch weights of {model_name} from huggingface. "

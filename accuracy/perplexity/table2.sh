@@ -10,14 +10,14 @@ budget=0.2
 for size in 6.7b 13b;do
   for dataset in "wikitext2" "ptb";do
     echo opt-$size ${dataset} 100% cache
-    python opt.py --model "../setup/opt-model/opt-${size}" \
+    python opt.py --model "${CKPTS}/opt-model/opt-${size}" \
       --eval_dataset ${dataset} \
       --seq_len ${seqlen} \
       --eval_samples 0 \
       --model_name "opt-${size}" \
       --infinigen \
       --partial_weight_ratio ${partial} \
-      --partial_weight_path "../setup/weights/opt-${size}_${partial}" \
+      --partial_weight_path "${CKPTS}/weights/opt-${size}_${partial}" \
       --alpha ${alpha} \
       --budget ${budget} \
       --capacity 1.0
@@ -28,14 +28,14 @@ for size in 6.7b 13b;do
   for dataset in "wikitext2" "ptb";do
     for evict in fifo lru counter;do
       echo opt-$size ${dataset} 80% cache evict ${evict}
-      python opt.py --model "../setup/opt-model/opt-${size}" \
+      python opt.py --model "${CKPTS}/opt-model/opt-${size}" \
       --eval_dataset ${dataset} \
         --seq_len ${seqlen} \
         --eval_samples 0 \
         --model_name "opt-${size}" \
         --infinigen \
         --partial_weight_ratio ${partial} \
-        --partial_weight_path "../setup/weights/opt-${size}_${partial}" \
+        --partial_weight_path "${CKPTS}/weights/opt-${size}_${partial}" \
         --alpha ${alpha} \
         --budget ${budget} \
         --capacity 0.8 \
@@ -58,8 +58,8 @@ for size in 7b 13b;do
       --model_name "llama-${size}" \
       --infinigen \
       --partial_weight_ratio ${partial} \
-      --partial_weight_path "../setup/weights/llama-2-${size}_${partial}" \
-      --skewing_matrix_path "../setup/skewing_matrix/llama-2-${size}.pt" \
+      --partial_weight_path "${CKPTS}/weights/llama-2-${size}_${partial}" \
+      --skewing_matrix_path "${CKPTS}/skewing_matrix/llama-2-${size}.pt" \
       --alpha ${alpha} \
       --budget ${budget} \
       --capacity 1.0 
@@ -77,8 +77,8 @@ for size in 7b 13b;do
         --model_name "llama-${size}" \
         --infinigen \
         --partial_weight_ratio ${partial} \
-        --partial_weight_path "../setup/weights/llama-2-${size}_${partial}" \
-        --skewing_matrix_path "../setup/skewing_matrix/llama-2-${size}.pt" \
+        --partial_weight_path "${CKPTS}/weights/llama-2-${size}_${partial}" \
+        --skewing_matrix_path "${CKPTS}/skewing_matrix/llama-2-${size}.pt" \
         --alpha ${alpha} \
         --budget ${budget} \
         --capacity 0.8 \

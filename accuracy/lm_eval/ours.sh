@@ -13,11 +13,11 @@ budget=$9
 no_skewing=${10}
 base_name=$(basename "${model}")
 if [ -z $no_skewing ]; then
-  weight_path="../setup/weights/${base_name}_${partial_weight}"
+  weight_path="${CKPTS}/weights/${base_name}_${partial_weight}"
 else 
-  weight_path="../setup/weights-no-skew/${base_name}_${partial_weight}"
+  weight_path="${CKPTS}/weights-no-skew/${base_name}_${partial_weight}"
 fi
-skewing_path="../setup/skewing_matrix/${base_name}.pt"
+skewing_path="${CKPTS}/skewing_matrix/${base_name}.pt"
 
 python -u run_lm_eval_harness.py \
   --input-path results/${task}-${shots}.jsonl \

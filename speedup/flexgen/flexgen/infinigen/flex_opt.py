@@ -13,7 +13,7 @@ from typing import Union, List, Optional
 import numpy as np
 from tqdm import tqdm
 import torch
-from modelscope import AutoTokenizer
+from transformers import AutoTokenizer
 
 from flexgen.compression import CompressionConfig
 from flexgen.opt_config import OptConfig, get_opt_config, download_opt_weights

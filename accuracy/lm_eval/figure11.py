@@ -33,7 +33,7 @@ for size in ["6.7b", "13b"]:
         cmd = []
         cmd.append("bash full_cache.sh")
         cmd.append(task)
-        cmd.append(f"facebook/opt-{size}")
+        cmd.append(f"{os.environ['MS_CACHE']}/facebook/opt-{size}")
         cmd.append("opt")
         cmd.append(str(shots))
         cmd = ' '.join(cmd)
@@ -43,7 +43,7 @@ for size in ["6.7b", "13b"]:
 
 # Llama-2
 llama_2_dir = os.environ["LLAMA_PATH"]
-for size in ["7b", "13b"]:
+for size in ["7b"]:
     if size == "7b":
         tasks = ["rte", "piqa"]
     elif size == "13b":
@@ -76,8 +76,8 @@ for size in ["6.7b", "13b"]:
             cmd = []
             cmd.append("bash ours.sh")
             cmd.append(task)
-            cmd.append(f"../setup/opt-model/opt-{size}")
-            cmd.append(f"facebook/opt-{size}")
+            cmd.append(f"{os.environ['CKPTS']}/opt-model/opt-{size}")
+            cmd.append(f"{os.environ['MS_CACHE']}/facebook/opt-{size}")
             cmd.append("opt")
             cmd.append(str(shots))
             cmd.append(str(partial))
@@ -92,7 +92,7 @@ for size in ["6.7b", "13b"]:
 
 # Llama-2
 llama_2_dir = os.environ["LLAMA_PATH"]
-for size in ["7b", "13b"]:
+for size in ["7b"]:
     if size == "7b":
         tasks = ["rte", "piqa"]
     elif size == "13b":
@@ -130,7 +130,7 @@ for size in ["6.7b", "13b"]:
             cmd = []
             cmd.append("bash h2o.sh")
             cmd.append(task)
-            cmd.append(f"facebook/opt-{size}")
+            cmd.append(f"{os.environ['MS_CACHE']}/facebook/opt-{size}")
             cmd.append("opt")
             cmd.append(str(shots))
             cmd.append(str(ratio)) # heavy_ratio
@@ -177,7 +177,7 @@ for size in ["6.7b", "13b"]:
             cmd = []
             cmd.append("bash quant.sh")
             cmd.append(task)
-            cmd.append(f"facebook/opt-{size}")
+            cmd.append(f"{os.environ['MS_CACHE']}/facebook/opt-{size}")
             cmd.append("opt")
             cmd.append(str(shots))
             cmd.append(str(qbits))

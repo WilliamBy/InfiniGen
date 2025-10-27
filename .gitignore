@@ -12,3 +12,19 @@ wheels/
 .env
 *.log
 *.so
+accuracy/transformers
+*.gz
+
+# intermediate files
+*.pt
+*.jsonl
+*.json
+*.txt
+*.csv
+*.tsv
+*.log
+*.log.gz
+*.log.bz2
+*.log.xz
+*.log.lzma
+*.log.zstd

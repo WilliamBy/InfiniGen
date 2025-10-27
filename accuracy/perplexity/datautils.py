@@ -1,4 +1,4 @@
-from modelscope import LlamaTokenizer, AutoTokenizer
+from transformers import LlamaTokenizer, AutoTokenizer
 from datasets import load_dataset
 import numpy as np
 import torch

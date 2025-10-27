@@ -7,7 +7,7 @@ seqlen=2048
 alpha=4.0
 budget=0.2
 echo opt-13b alpha $alpha budget $budget
-python opt.py --model "../setup/opt-model/opt-13b" \
+python opt.py --model "${CKPTS}/opt-model/opt-13b" \
   --eval_dataset "wikitext2" \
   --seq_len ${seqlen} \
   --eval_samples 0 \
@@ -15,7 +15,7 @@ python opt.py --model "../setup/opt-model/opt-13b" \
   --infinigen \
   --print_blk_ppl \
   --partial_weight_ratio ${partial} \
-  --partial_weight_path "../setup/weights/opt-13b_${partial}" \
+  --partial_weight_path "${CKPTS}/weights/opt-13b_${partial}" \
   --alpha ${alpha} \
   --budget ${budget} \
   --capacity 1.0 
@@ -33,8 +33,8 @@ python llama.py --model "${LLAMA_PATH}/llama-2-13b" \
   --infinigen \
   --print_blk_ppl \
   --partial_weight_ratio ${partial} \
-  --partial_weight_path "../setup/weights/llama-2-13b_${partial}" \
-  --skewing_matrix_path "../setup/skewing_matrix/llama-2-13b.pt" \
+  --partial_weight_path "${CKPTS}/weights/llama-2-13b_${partial}" \
+  --skewing_matrix_path "${CKPTS}/skewing_matrix/llama-2-13b.pt" \
   --alpha ${alpha} \
   --budget ${budget} \
   --capacity 1.0 

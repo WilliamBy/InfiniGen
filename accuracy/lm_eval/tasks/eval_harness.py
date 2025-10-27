@@ -1,7 +1,6 @@
 from functools import partial
 
 import os
-import transformers
 from lm_eval.base import LM
 from tqdm import tqdm
 import numpy as np
@@ -10,7 +9,7 @@ from tasks.util import sample_batch, shrink_seq
 import multiprocessing
 import ftfy
 
-from modelscope import AutoModelForCausalLM, AutoTokenizer, AutoConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
 
 tokenizer = None
 

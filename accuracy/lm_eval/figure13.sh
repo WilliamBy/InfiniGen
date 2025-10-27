@@ -25,12 +25,12 @@ budget=0.2
 # w/o skewing
 echo "InfiniGen w/o skewing"
 for task in copa openbookqa winogrande piqa rte; do
-  bash ours.sh ${task} "../setup/opt-model-no-skew/opt-6.7b" "facebook/opt-6.7b" opt ${shots} ${partial} ${alpha} ${capacity} ${budget} "no-skew"
+  bash ours.sh ${task} "${CKPTS}/opt-model-no-skew/opt-6.7b" "facebook/opt-6.7b" opt ${shots} ${partial} ${alpha} ${capacity} ${budget} "no-skew"
 done
 
 
 # w/ skewing
 echo "InfiniGen w/ skewing"
 for task in copa openbookqa winogrande piqa rte; do
-  bash ours.sh ${task} "../setup/opt-model/opt-6.7b" "facebook/opt-6.7b" opt ${shots} ${partial} ${alpha} ${capacity} ${budget}
+  bash ours.sh ${task} "${CKPTS}/opt-model/opt-6.7b" "facebook/opt-6.7b" opt ${shots} ${partial} ${alpha} ${capacity} ${budget}
 done

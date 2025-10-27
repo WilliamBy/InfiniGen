@@ -13,7 +13,7 @@ def get_llama(model, seqlen):
     torch.nn.init.uniform_ = skip
     torch.nn.init.normal_ = skip
 
-    from modelscope import LlamaForCausalLM
+    from transformers import LlamaForCausalLM
     model = LlamaForCausalLM.from_pretrained(model, device_map='cpu', torch_dtype=torch.float16)
 
     model.seqlen = seqlen

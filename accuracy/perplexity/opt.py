@@ -13,7 +13,7 @@ def get_opt_base(model, seq_len):
     torch.nn.init.uniform_ = skip
     torch.nn.init.normal_ = skip
 
-    from modelscope import OPTForCausalLM
+    from transformers import OPTForCausalLM
     model = OPTForCausalLM.from_pretrained(model, torch_dtype=torch.float16, device_map = 'cpu')
     
     model.seqlen = seq_len
