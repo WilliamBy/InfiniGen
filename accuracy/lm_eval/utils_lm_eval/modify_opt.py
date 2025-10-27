@@ -13,7 +13,7 @@ import torch.nn.functional as F
 from torch.cuda.amp import autocast
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 
-from modelscope.models.opt.modeling_opt import OPTAttention
+from transformers.models.opt.modeling_opt import OPTAttention
 
 
 __all__ = ['convert_kvcache_opt_heavy_recent', 'OPTAttention_Mask']
